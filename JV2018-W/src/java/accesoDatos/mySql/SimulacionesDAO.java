@@ -95,12 +95,13 @@ public class SimulacionesDAO implements OperacionesDAO {
     private void crearTablaSimulaciones() throws SQLException {
    	 Statement s = db.createStatement();
    	 s.executeUpdate("CREATE TABLE IF NOT EXISTS simulaciones("  
-   			 + "usr VARCHAR(45) NOT NULL,"
+   			 + "usr VARCHAR(45) NOT NULL ,"
    			 + "fecha DATE,"
-   			 + "mundo VARCHAR(45) NOT NULL,"
-   			 + "ciclos CHAR(10) NOT NULL,"  
-   			 + "estado VARCHAR(20) NOT NULL);"  
-   			 );
+   			 + "mundo VARCHAR(45) NOT NULL ,"
+   			 + "ciclos CHAR(10) NOT NULL ,"  
+   			 + "estado VARCHAR(20) NOT NULL ," 
+   			+ "PRIMARY KEY (`usr`, `fecha`))");
+   			 
     }
  
     // MÉTODOS DAO Usuarios
@@ -114,6 +115,170 @@ public class SimulacionesDAO implements OperacionesDAO {
     public Simulacion obtener(Object obj) {
    	 assert obj != null;
    	 return obtener(((Simulacion) obj).getId());
+    }
+ 
+    //1
+    private void cargarPredeterminados() throws SQLException, DatosException {
+    	try {
+			alta(new Simulacion());
+			alta(new Simulacion(new Usuario(),
+					new Fecha(),new Mundo(),8,Simulacion.EstadoSimulacion.PREPARADA));
+		} catch (ModeloException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+    }
+    //2. Jorge
+    
+    /**
+     * Obtiene el usuario buscado dado su id, el nif o el correo.  
+     * Si no existe devuelve null.
+     * @param idUsr del usuario a obtener.
+     * @return (Usuario) buscado.  
+     */    
+    @Override
+    public Simulacion obtener(String id) {   	 
+   	 assert id != null;
+   	 assert !id.equals("");
+   	 assert !id.equals(" ");
+   	 
+   	 ejecutarConsulta(id);
+ 
+   	 // Establece columnas y etiquetas.
+   	 establecerColumnasModelo();
+ 
+   	 // Borrado previo de filas.
+   	 borrarFilasModelo();
+ 
+   	 // Volcado desde el resulSet.
+   	 rellenarFilasModelo();
+ 
+   	 // Actualiza buffer de objetos.
+   	 sincronizarBufferUsuarios();
+ 
+   	 if (bufferSimulaciones.size() > 0) {
+   		 return (Simulacion) bufferSimulaciones.get(0);
+   	 }
+   	 return null;
+    }
+ 
+    /**
+     * Determina el idUsr recibido y ejecuta la consulta.
+     * Los resultados quedan en el ResultSet
+     * @param idUsr
+     */
+    private void ejecutarConsulta(String idSimul) {
+   	 try {
+   		 rsSimulaciones = stSimulaciones.executeQuery("SELECT * FROM simulaciones " 
+   		 	+ "WHERE CONCAT(usr,':',DATE_FORMAT(fecha,'%Y%m%d%H%i%s'))='"+ idSimul+"'");
+   	 }  
+   	 catch (SQLException e) {
+   		 e.printStackTrace();
+   	 }
+    }
+ 
+    /**
+     * Crea las columnas del TableModel a partir de los metadatos del ResultSet
+     * de una consulta a base de datos
+     */
+    private void establecerColumnasModelo() {
+   	 try {
+   		 // Obtiene metadatos.
+   		 ResultSetMetaData metaDatos = this.rsSimulaciones.getMetaData();
+ 
+   		 // Número total de columnas.
+   		 int numCol = metaDatos.getColumnCount();
+ 
+   		 // Etiqueta de cada columna.
+   		 Object[] etiquetas = new Object[numCol];
+   		 for (int i = 0; i < numCol; i++) {
+   			 etiquetas[i] = metaDatos.getColumnLabel(i + 1);
+   		 }
+ 
+   		 // Incorpora array de etiquetas en el TableModel.
+   		 ((DefaultTableModel) this.tmSimulaciones).setColumnIdentifiers(etiquetas);
+   	 }  
+   	 catch (SQLException e) {
+   		 e.printStackTrace();
+   	 }
+    }
+ 
+    /**
+     * Borra todas las filas del TableModel
+     * @param tm - El TableModel a vaciar
+     */
+    private void borrarFilasModelo() {
+   	 while (this.tmSimulaciones.getRowCount() > 0)
+   		 ((DefaultTableModel) this.tmSimulaciones).removeRow(0);
+    }
+ 
+    /**
+     * Replica en el TableModel las filas del ResultSet
+     */
+    private void rellenarFilasModelo() {
+   	 Object[] datosFila = new Object[this.tmSimulaciones.getColumnCount()];
+   	 // Para cada fila en el ResultSet de la consulta.
+   	 try {
+   		 while (rsSimulaciones.next()) {
+   			 // Se replica y añade la fila en el TableModel.
+   			 for (int i = 0; i < this.tmSimulaciones.getColumnCount(); i++) {
+   				 datosFila[i] = this.rsSimulaciones.getObject(i + 1);
+   			 }
+   			 ((DefaultTableModel) this.tmSimulaciones).addRow(datosFila);
+   		 }
+   	 }  
+   	 catch (SQLException e) {
+   		 e.printStackTrace();
+   	 }
+    }
+ 
+    /**
+     * Regenera lista de los objetos procesando el tableModel.  
+     */    
+    private void sincronizarBufferUsuarios() {
+   	 bufferSimulaciones.clear();
+   	 for (int i = 0; i < tmSimulaciones.getRowCount(); i++) {
+   		 Usuario usr = new Usuario((Usuario) tmSimulaciones.getValueAt(i, 0));
+   		 Fecha fecha = new Fecha((java.sql.Date)tmSimulaciones.getValueAt(i, 1));
+   		 Mundo mundo = new Mundo((Mundo)tmSimulaciones.getValueAt(i, 2));
+   		 int ciclos = (int) tmSimulaciones.getValueAt(i, 3);
+   		 EstadoSimulacion estado = null;
+   		 switch ((String) tmSimulaciones.getValueAt(i, 4)) {
+   		 case "PREPARADA":   
+   			 estado = EstadoSimulacion.PREPARADA;
+   			 break;
+   		 case "INICIADA":
+   			 estado = EstadoSimulacion.INICIADA;
+   			 break;
+   		 case "COMPLETADA":
+   			 estado = EstadoSimulacion.COMPLETADA;
+   			 break;
+   		 }    
+   		 // Genera y guarda objeto
+   		 bufferSimulaciones.add(new Simulacion(usr, fecha, mundo, ciclos, estado));
+   	 }
+    }
+ 
+    public ArrayList<Simulacion> obtenerTodasMismoUsr(String idUsr) {
+   	 assert idUsr != null;
+   	 assert !idUsr.equals("");
+   	 assert !idUsr.equals(" ");
+   	 
+   	 try {
+   		 rsSimulaciones = stSimulaciones.executeQuery("SELECT * FROM simulaciones WHERE usr = '"+ idUsr + "'");
+   		 this.establecerColumnasModelo();
+
+   		 this.borrarFilasModelo();
+
+   		 this.rellenarFilasModelo();
+
+   		 this.sincronizarBufferUsuarios();   
+   	 
+   	 } catch (SQLException e) {
+   		 e.printStackTrace();
+   	 }
+   	 
+   	 return this.bufferSimulaciones;
     }
      
    
