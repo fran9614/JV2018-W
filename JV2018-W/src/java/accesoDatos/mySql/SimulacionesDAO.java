@@ -5,10 +5,11 @@
  *  Colabora en el patron Fachada.
  *  @since: prototipo2.2
  *  @source: SimulacionesDAO.java  
- *  @version: 2.2 - 2019/06/05  
+ *  @version: 2.2 - 2019/06/11  
  *  @author: Jorge Orenes Rubio
  *  @author: VictorJLucas
  *  @author ARM - Antonio Ramírez Márquez
+ *  @author: Fran Arce
  */
  
 package accesoDatos.mySql;
@@ -40,7 +41,6 @@ import util.Formato;
  
 public class SimulacionesDAO implements OperacionesDAO {
     
-    //1. Victor
  
     // Singleton
     private static SimulacionesDAO instance = null;
@@ -129,7 +129,7 @@ public class SimulacionesDAO implements OperacionesDAO {
 			e.printStackTrace();
 		}
     }
-    //2. Jorge
+
     
     /**
      * Obtiene el usuario buscado dado su id, el nif o el correo.  
@@ -388,9 +388,108 @@ public class SimulacionesDAO implements OperacionesDAO {
 		}
 		throw new DatosException("Actualizar: "+ simuActualizado.getId() + " no existe.");
     }
+    
+    /**
+     * Adapta el formato de la fecha para consultas mySql.
+     * @param fecha
+     * @return String
+     */
+    private static String fechaParaSimulacion(Fecha fecha) {
+        
+            String año=fecha.toStringMarcaTiempo().substring(0,4);
+            String mes=fecha.toStringMarcaTiempo().substring(4,6);
+            String dia=fecha.toStringMarcaTiempo().substring(6,8);
+            
+        return año+"-"+mes+"-"+dia ;
+            
+    }
 
     
+    /** Devuelve listado completo de usuarios.
+     *  @return texto con el volcado de todos los usuarios.
+     */
+    @Override
+    public String listarDatos() {
+        return obtenerTodos().toString();
+    }
+ 
+    /**
+     * Obtiene todos los usuarios almacenados.  
+     * Si no hay resultados devuelve null.
+     * @param idUsr a obtener.
+     * @return (DefaultTableModel) result obtenido.
+     * @throws SQLException  
+     */    
+    public ArrayList<Simulacion> obtenerTodos() {
+        try {
+            // Se realiza la consulta y los resultados quedan en el ResultSet
+            this.rsSimulaciones = stSimulaciones.executeQuery("SELECT * FROM simulaciones");
+ 
+            // Establece columnas y etiquetas
+            this.establecerColumnasModelo();
+ 
+            // Borrado previo de filas
+            this.borrarFilasModelo();
+ 
+            // Volcado desde el resulSet
+            this.rellenarFilasModelo();
+ 
+            // Actualiza buffer de objetos.
+            this.sincronizarBufferUsuarios();    
+        }  
+        catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return this.bufferSimulaciones;
+    }
+ 
+    @Override
+    public void borrarTodo() {
+        bufferSimulaciones.clear();
+        try {
+            this.stSimulaciones.executeQuery("DELETE FROM simulaciones");
+        }  
+        catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+ 
+    /**
+     * Obtiene el listado de todos id de los objetos almacenados.
+     * @return el texto con el volcado de id.
+     */
+    @Override
+    public String listarId() {
+        try {
+           
+           
+            this.rsSimulaciones = stSimulaciones.executeQuery("SELECT CONCAT(usuario,':',DATE_FORMAT(fecha,'%Y%m%d%H%i%s')) FROM simulaciones");
+        }  
+        catch (SQLException e) {
+            e.printStackTrace();
+        }
+        this.establecerColumnasModelo();
+        this.borrarFilasModelo();
+        this.rellenarFilasModelo();
+        StringBuilder result = new StringBuilder();
+        for (int i = 0; i < tmSimulaciones.getRowCount(); i++) {
+            String id = (String) tmSimulaciones.getValueAt(i, 0);
+        }
+        return result.toString();
+    }
+ 
+    /**
+     * Cierra conexiones.
+     */
+    @Override
+    public void cerrar() {
+        try {
+            stSimulaciones.close();
+        }  
+        catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+    
 } // class
-
-
 
